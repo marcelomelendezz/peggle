@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>PEGGLE · LUKSO</title>
+<link href="https://fonts.googleapis.com/css2?family=MedievalSharp&family=Uncial+Antiqua&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:     #05030a;
+  --gold:   #f0c040;
+  --gold2:  #ffd700;
+  --peg-b:  #2266ff;
+  --peg-o:  #ff6600;
+  --peg-g:  #22cc44;
+  --peg-p:  #cc22ff;
+  --text:   #e8d8a0;
+}
+* { margin:0; padding:0; box-sizing:border-box; touch-action:none; }
+body {
+  background:var(--bg);
+  background-image:
+    radial-gradient(ellipse at 50% 0%, rgba(240,192,64,0.07) 0%, transparent 55%),
+    radial-gradient(ellipse at 20% 100%, rgba(34,102,255,0.05) 0%, transparent 40%),
+    radial-gradient(ellipse at 80% 100%, rgba(204,34,255,0.05) 0%, transparent 40%);
+  display:flex; flex-direction:column; align-items:center;
+  min-height:100vh; overflow:hidden; user-select:none;
+  font-family:'Share Tech Mono', monospace;
+}
+
+/* ── HEADER ── */
+header {
+  width:100%; max-width:400px;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:8px 14px 5px;
+  border-bottom:1px solid rgba(240,192,64,0.2);
+  flex-shrink:0;
+}
+.logo {
+  font-family:'Uncial Antiqua', cursive;
+  font-size:1.4rem; color:var(--gold);
+  text-shadow:0 0 20px rgba(240,192,64,0.5), 2px 2px 0 rgba(0,0,0,0.8);
+  line-height:1;
+}
+.logo-sub {
+  font-size:0.35rem; letter-spacing:0.22em;
+  color:rgba(240,192,64,0.35); display:block; margin-top:2px;
+}
+.hud { display:flex; gap:8px; align-items:center; }
+.hud-box { background:rgba(0,0,0,0.5); border:1px solid rgba(240,192,64,0.2);
+  padding:3px 9px; text-align:center; }
+.hud-label { font-size:0.33rem; letter-spacing:0.15em;
+  color:rgba(240,192,64,0.4); display:block; }
+.hud-val { font-family:'Uncial Antiqua',cursive; font-size:1rem;
+  color:var(--gold); text-shadow:0 0 8px rgba(240,192,64,0.4); display:block; }
+
+/* ── CANVAS ── */
+#canvas-wrap { position:relative; flex-shrink:0; cursor:crosshair; }
+canvas { display:block; }
+
+/* ── OVERLAY ── */
+#overlay {
+  position:absolute; inset:0;
+  background:rgba(3,2,8,0.92); backdrop-filter:blur(8px);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  z-index:30;
+}
+#overlay.hidden { display:none; }
+.ov-rose {
+  font-size:3.5rem; margin-bottom:6px;
+  filter:drop-shadow(0 0 16px rgba(240,192,64,0.6));
+  animation:spin-slow 8s linear infinite;
+}
+@keyframes spin-slow { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+.ov-title {
+  font-family:'Uncial Antiqua',cursive;
+  font-size:2.2rem; letter-spacing:0.08em; color:var(--gold2);
+  text-shadow:0 0 30px rgba(240,192,64,0.5), 2px 2px 0 rgba(0,0,0,0.8);
+  margin-bottom:3px; line-height:1;
+}
+.ov-sub {
+  font-size:0.42rem; letter-spacing:0.22em;
+  color:rgba(240,192,64,0.35); margin-bottom:18px;
+}
+.ov-stats { display:none; gap:14px; margin-bottom:18px; }
+.ov-stats.show { display:flex; }
+.ov-stat { background:rgba(0,0,0,0.4); border:1px solid rgba(240,192,64,0.2);
+  padding:8px 16px; text-align:center; }
+.ov-stat-num { font-family:'Uncial Antiqua',cursive; font-size:1.6rem;
+  color:var(--gold2); text-shadow:0 0 10px rgba(240,192,64,0.4); display:block; }
+.ov-stat-label { font-size:0.38rem; letter-spacing:0.12em; color:rgba(240,192,64,0.4); }
+.ov-btn {
+  font-family:'Uncial Antiqua',cursive; font-size:0.85rem; letter-spacing:0.12em;
+  background:transparent; border:1px solid rgba(240,192,64,0.5);
+  color:var(--gold2); padding:11px 30px; cursor:pointer;
+  transition:all 0.15s; text-shadow:0 0 8px rgba(240,192,64,0.3);
+  position:relative;
+}
+.ov-btn::before { content:''; position:absolute; inset:4px;
+  border:1px solid rgba(240,192,64,0.12); pointer-events:none; }
+.ov-btn:hover { background:rgba(240,192,64,0.1); box-shadow:0 0 20px rgba(240,192,64,0.2); }
+.ov-hint { font-size:0.38rem; letter-spacing:0.15em;
+  color:rgba(100,90,60,0.8); margin-top:10px; }
+
+/* ── BOTTOM BAR ── */
+#bottom-bar {
+  width:100%; max-width:400px;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:5px 14px 8px; flex-shrink:0;
+}
+.balls-display { display:flex; gap:5px; align-items:center; }
+.ball-dot { width:10px; height:10px; border-radius:50%;
+  background:radial-gradient(circle at 35% 35%, #ffffff, #aaddff);
+  box-shadow:0 0 6px rgba(180,220,255,0.6); }
+.ball-dot.used { background:#1a1a2a; box-shadow:none; border:1px solid rgba(100,100,150,0.3); }
+.peg-counter { font-size:0.38rem; letter-spacing:0.15em;
+  color:rgba(240,192,64,0.5); text-align:right; }
+.peg-orange { color:#ff8844; }
+.level-badge { font-family:'Uncial Antiqua',cursive;
+  font-size:0.75rem; color:var(--gold); opacity:0.7; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">✦ PEGGLE
+    <span class="logo-sub">LUKSO ARCADE · VITRAL SAGRADO</span>
+  </div>
+  <div class="hud">
+    <div class="hud-box"><span class="hud-label">NIVEL</span><span class="hud-val" id="level-el">1</span></div>
+    <div class="hud-box"><span class="hud-label">PUNTOS</span><span class="hud-val" id="score-el">0</span></div>
+    <div class="hud-box"><span class="hud-label">MEJOR</span><span class="hud-val" id="hi-el">0</span></div>
+  </div>
+</header>
+
+<div id="canvas-wrap">
+  <canvas id="game"></canvas>
+  <div id="overlay">
+    <div class="ov-rose">✦</div>
+    <div class="ov-title" id="ov-title">PEGGLE</div>
+    <div class="ov-sub"   id="ov-sub">LUKSO · ROMPE EL VITRAL</div>
+    <div class="ov-stats" id="ov-stats">
+      <div class="ov-stat"><span class="ov-stat-num" id="ov-score">0</span><span class="ov-stat-label">PUNTOS</span></div>
+      <div class="ov-stat"><span class="ov-stat-num" id="ov-level">1</span><span class="ov-stat-label">NIVEL</span></div>
+    </div>
+    <button class="ov-btn" id="ov-btn" onclick="startLevel()">✦ LANZAR</button>
+    <div class="ov-hint" id="ov-hint">MUEVE EL RATÓN · CLICK / TOCA PARA DISPARAR</div>
+  </div>
+</div>
+
+<div id="bottom-bar">
+  <div class="balls-display" id="balls-display"></div>
+  <div class="level-badge" id="level-badge">NIVEL 1</div>
+  <div class="peg-counter">
+    <span class="peg-orange" id="orange-left">0</span> naranjas
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// CANVAS SETUP
+// ═══════════════════════════════════════════════════════
+const canvas = document.getElementById('game');
+const ctx    = canvas.getContext('2d');
+const wrap   = document.getElementById('canvas-wrap');
+
+let W = 400, H = 500;
+function resize() {
+  W = Math.min(window.innerWidth, 400);
+  H = Math.round(W * 1.25);
+  canvas.width = W; canvas.height = H;
+  wrap.style.width = W+'px'; wrap.style.height = H+'px';
+}
+resize();
+window.addEventListener('resize', () => { resize(); initLevel(currentLevel); });
+
+let hiScore = parseInt(localStorage.getItem('pg_hi') || '0');
+document.getElementById('hi-el').textContent = hiScore;
+
+// ═══════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════
+const GRAVITY    = 0.22;
+const BALL_R     = () => W * 0.028;
+const PEG_R      = () => W * 0.028;
+const LAUNCHER_Y = H * 0.04;
+const BUCKET_W   = () => W * 0.20;
+const BUCKET_H   = () => H * 0.035;
+const BALLS_MAX  = 10;
+const TOTAL_LEVELS = 8;
+
+// Peg colors / types
+// 'b' = blue (normal), 'o' = orange (target), 'g' = green (extra ball), 'p' = purple (2x score)
+const PEG_COLORS = {
+  b: { fill:'#1a3aaa', glow:'#4488ff', lit:'#66aaff', shine:'rgba(180,220,255,0.6)' },
+  o: { fill:'#aa3300', glow:'#ff6600', lit:'#ff9944', shine:'rgba(255,200,100,0.7)' },
+  g: { fill:'#116622', glow:'#22cc44', lit:'#44ee66', shine:'rgba(120,255,150,0.6)' },
+  p: { fill:'#661188', glow:'#cc22ff', lit:'#dd66ff', shine:'rgba(220,150,255,0.7)' },
+};
+
+// ═══════════════════════════════════════════════════════
+// LEVEL LAYOUTS  (8 levels)
+// ═══════════════════════════════════════════════════════
+function makePeg(xf, yf, type='b') {
+  return { xf, yf, type, hit:false, fadeTimer:0 };
+}
+
+const LEVEL_LAYOUTS = [
+  // Level 1 — simple grid
+  () => {
+    const pegs = [];
+    for (let r=0;r<5;r++) for (let c=0;c<7;c++) {
+      const t = (r===2&&(c===1||c===3||c===5)) ? 'o' :
+                (r===0&&c===3) ? 'g' :
+                (r===4&&c===6) ? 'p' : 'b';
+      pegs.push(makePeg(0.1+c*0.13, 0.2+r*0.12, t));
+    }
+    return pegs;
+  },
+  // Level 2 — diamond pattern
+  () => {
+    const pegs = [];
+    const pts = [
+      [0.5,0.15],[0.35,0.22],[0.65,0.22],[0.22,0.32],[0.5,0.32],[0.78,0.32],
+      [0.1,0.44],[0.35,0.44],[0.65,0.44],[0.9,0.44],
+      [0.22,0.56],[0.5,0.56],[0.78,0.56],
+      [0.35,0.68],[0.65,0.68],[0.5,0.78],
+      [0.18,0.28],[0.82,0.28],[0.18,0.62],[0.82,0.62],
+    ];
+    const orangeIdx = [0,5,9,15];
+    const greenIdx  = [10];
+    const purpIdx   = [3];
+    pts.forEach(([xf,yf],i)=>{
+      const t = orangeIdx.includes(i)?'o': greenIdx.includes(i)?'g': purpIdx.includes(i)?'p':'b';
+      pegs.push(makePeg(xf, yf, t));
+    });
+    return pegs;
+  },
+  // Level 3 — zigzag rows
+  () => {
+    const pegs = [];
+    for (let r=0;r<6;r++) {
+      const offset = r%2===0 ? 0 : 0.07;
+      const cols = r%2===0 ? 7 : 6;
+      for (let c=0;c<cols;c++) {
+        const xf = offset + 0.08 + c*0.13;
+        const yf = 0.18 + r*0.11;
+        const isOrange = (r+c)%5===0;
+        const isGreen  = r===2&&c===3;
+        const isPurp   = r===5&&c===0;
+        pegs.push(makePeg(xf, yf, isGreen?'g':isPurp?'p':isOrange?'o':'b'));
+      }
+    }
+    return pegs;
+  },
+  // Level 4 — two arcs
+  () => {
+    const pegs = [];
+    for (let i=0;i<11;i++) {
+      const a = Math.PI * i/10;
+      pegs.push(makePeg(0.15+Math.cos(a)*0.35, 0.42-Math.sin(a)*0.22,
+        i===5?'o': i===3||i===7?'p':'b'));
+    }
+    for (let i=0;i<11;i++) {
+      const a = Math.PI * i/10;
+      pegs.push(makePeg(0.15+Math.cos(a)*0.35, 0.72-Math.sin(a)*0.22,
+        i===5?'g': i===2||i===8?'o':'b'));
+    }
+    for (let i=0;i<7;i++)
+      pegs.push(makePeg(0.12+i*0.13, 0.25, i===3?'o':'b'));
+    return pegs;
+  },
+  // Level 5 — cross/cathedral window
+  () => {
+    const pegs = [];
+    // Vertical bar
+    for (let i=0;i<9;i++) pegs.push(makePeg(0.5, 0.15+i*0.08, i===4?'o':i%3===0?'p':'b'));
+    // Horizontal bar
+    for (let i=0;i<9;i++) pegs.push(makePeg(0.08+i*0.105, 0.45, i===4?'o':i%3===0?'g':'b'));
+    // Corners
+    [[0.2,0.25],[0.8,0.25],[0.2,0.65],[0.8,0.65]].forEach(([x,y],i)=>
+      pegs.push(makePeg(x,y,i%2===0?'o':'p')));
+    // Scatter
+    [[0.15,0.78],[0.35,0.82],[0.5,0.78],[0.65,0.82],[0.85,0.78]].forEach(([x,y])=>
+      pegs.push(makePeg(x,y,'b')));
+    return pegs;
+  },
+  // Level 6 — spiral
+  () => {
+    const pegs = [];
+    for (let i=0;i<24;i++) {
+      const a = i/24*Math.PI*2 - Math.PI/2;
+      const r = 0.15+i*0.008;
+      pegs.push(makePeg(0.5+Math.cos(a)*r, 0.45+Math.sin(a)*r*0.85,
+        i%6===0?'o': i%8===0?'g': i%10===0?'p':'b'));
+    }
+    for (let i=0;i<12;i++) {
+      const a = i/12*Math.PI*2;
+      pegs.push(makePeg(0.5+Math.cos(a)*0.38, 0.45+Math.sin(a)*0.32,
+        i%3===0?'o':'b'));
+    }
+    return pegs;
+  },
+  // Level 7 — checkerboard scatter
+  () => {
+    const pegs = [];
+    for (let r=0;r<7;r++) for (let c=0;c<6;c++) {
+      if ((r+c)%2===0) continue;
+      const xf = 0.1+c*0.15, yf = 0.15+r*0.11;
+      const t = r===3&&c===3?'g': (r+c)%7===0?'o': (r*c)%11===0?'p':'b';
+      pegs.push(makePeg(xf, yf, t));
+    }
+    return pegs;
+  },
+  // Level 8 — FINAL: mandala
+  () => {
+    const pegs = [];
+    const rings = [[0.08,8,'b'],[0.16,14,'b'],[0.24,18,'o'],[0.32,22,'p'],[0.38,10,'g']];
+    rings.forEach(([rad,count,type])=>{
+      for (let i=0;i<count;i++) {
+        const a = i/count*Math.PI*2;
+        pegs.push(makePeg(0.5+Math.cos(a)*rad, 0.45+Math.sin(a)*rad*0.88, type));
+      }
+    });
+    pegs.push(makePeg(0.5, 0.45, 'o'));
+    return pegs;
+  },
+];
+
+// ═══════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════
+let state = 'start';
+let score = 0, currentLevel = 1, ballsLeft = BALLS_MAX;
+let pegs = [], ball = null, bucket = {}, particles = [];
+let aimAngle = 0, mouseX = W/2, mouseY = H/2;
+let animId = null, frameCount = 0;
+let hitThisShot = [], lastHitScore = 0;
+let bucketDir = 1;
+let scorePopups = [];
+let levelClearTimer = 0;
+let feverMode = false, feverTimer = 0;
+let ballInFlight = false;
+
+// ═══════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════
+function initLevel(lvl) {
+  currentLevel = lvl;
+  pegs = LEVEL_LAYOUTS[(lvl-1) % LEVEL_LAYOUTS.length]().map(p => ({
+    ...p,
+    x: p.xf * W,
+    y: p.yf * H,
+    r: PEG_R(),
+    hit: false, fadeTimer: 0, glowPulse: Math.random()*Math.PI*2,
+  }));
+  bucket = { x: W/2, y: H - BUCKET_H()*2, w: BUCKET_W(), h: BUCKET_H(), caught: false };
+  ball   = null;
+  particles = []; scorePopups = [];
+  hitThisShot = [];
+  ballInFlight = false;
+  feverMode = false; feverTimer = 0;
+  levelClearTimer = 0;
+  bucketDir = 1;
+  updateOrangeCounter();
+  updateBallsUI();
+  document.getElementById('level-el').textContent = lvl;
+  document.getElementById('level-badge').textContent = 'NIVEL ' + lvl;
+}
+
+function updateOrangeCounter() {
+  const left = pegs.filter(p=>p.type==='o'&&!p.hit).length;
+  document.getElementById('orange-left').textContent = left;
+}
+
+function updateBallsUI() {
+  const el = document.getElementById('balls-display');
+  el.innerHTML = '';
+  for (let i=0;i<BALLS_MAX;i++) {
+    const d = document.createElement('div');
+    d.className = 'ball-dot' + (i >= ballsLeft ? ' used' : '');
+    el.appendChild(d);
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// FIRE
+// ═══════════════════════════════════════════════════════
+function fire() {
+  if (ballInFlight || state !== 'playing') return;
+  if (ballsLeft <= 0) return;
+  const speed = H * 0.012;
+  ball = {
+    x: W/2, y: LAUNCHER_Y + BALL_R()*1.5,
+    vx: Math.sin(aimAngle) * speed,
+    vy: Math.cos(aimAngle) * speed,
+    r: BALL_R(), trail: [],
+  };
+  ballsLeft--;
+  ballInFlight = true;
+  hitThisShot  = [];
+  updateBallsUI();
+}
+
+// ═══════════════════════════════════════════════════════
+// UPDATE
+// ═══════════════════════════════════════════════════════
+function update() {
+  if (state !== 'playing') return;
+  frameCount++;
+
+  // ── BUCKET
+  const bspd = W * 0.006 * (1 + currentLevel * 0.05);
+  bucket.x += bspd * bucketDir;
+  if (bucket.x + bucket.w/2 > W - W*0.04) bucketDir = -1;
+  if (bucket.x - bucket.w/2 < W*0.04)     bucketDir =  1;
+
+  // ── AIM LINE — follow mouse/touch
+  const dx = mouseX - W/2, dy = mouseY - LAUNCHER_Y;
+  aimAngle = Math.atan2(dx, Math.max(dy, 10));
+
+  // ── BALL PHYSICS
+  if (ball) {
+    // Trail
+    ball.trail.push({x:ball.x, y:ball.y, t:1});
+    if (ball.trail.length > 16) ball.trail.shift();
+    ball.trail.forEach(t => t.t -= 0.06);
+    ball.trail = ball.trail.filter(t => t.t > 0);
+
+    ball.vy += GRAVITY;
+    ball.x  += ball.vx;
+    ball.y  += ball.vy;
+
+    // Wall bounces
+    if (ball.x - ball.r < 0)   { ball.x = ball.r;   ball.vx = Math.abs(ball.vx); spawnBounceParticles(ball.x, ball.y, 'wall'); }
+    if (ball.x + ball.r > W)   { ball.x = W-ball.r;  ball.vx = -Math.abs(ball.vx); spawnBounceParticles(ball.x, ball.y, 'wall'); }
+
+    // Peg collisions
+    pegs.forEach(p => {
+      if (p.hit) return;
+      const dx = ball.x - p.x, dy = ball.y - p.y;
+      const dist = Math.sqrt(dx*dx+dy*dy);
+      if (dist < ball.r + p.r + 1) {
+        // Reflect velocity
+        const nx = dx/dist, ny = dy/dist;
+        const dot = ball.vx*nx + ball.vy*ny;
+        ball.vx = (ball.vx - 2*dot*nx) * 0.98;
+        ball.vy = (ball.vy - 2*dot*ny) * 0.98;
+        // Push out of overlap
+        const overlap = ball.r + p.r + 1 - dist;
+        ball.x += nx * overlap;
+        ball.y += ny * overlap;
+        // Mark peg hit
+        if (!hitThisShot.includes(p)) {
+          p.hit = true;
+          p.fadeTimer = 80;
+          hitThisShot.push(p);
+          hitPeg(p, ball.x, ball.y);
+        }
+      }
+    });
+
+    // Bucket catch
+    const bx = bucket.x, by = bucket.y;
+    const bw2 = bucket.w/2;
+    if (ball.y + ball.r > by && ball.y < by + bucket.h &&
+        ball.x > bx - bw2 && ball.x < bx + bw2) {
+      // Caught! Give bonus ball
+      ballsLeft = Math.min(BALLS_MAX, ballsLeft + 1);
+      updateBallsUI();
+      spawnBucketParticles(bx, by);
+      scorePopups.push({x:bx, y:by-20, text:'BOLA GRATIS!', color:'#ffd700', life:1, size:1.1});
+      endShot();
+      return;
+    }
+
+    // Off screen bottom
+    if (ball.y - ball.r > H + 10) {
+      endShot();
+    }
+  }
+
+  // ── PEG FADE
+  pegs.forEach(p => {
+    if (p.fadeTimer > 0) p.fadeTimer--;
+    p.glowPulse = (p.glowPulse + 0.04) % (Math.PI*2);
+  });
+  pegs = pegs.filter(p => !(p.hit && p.fadeTimer <= 0));
+
+  // ── FEVER
+  if (feverMode) {
+    feverTimer--;
+    if (feverTimer <= 0) feverMode = false;
+  }
+
+  // ── PARTICLES / POPUPS
+  particles.forEach(p => {
+    p.x+=p.vx; p.y+=p.vy; p.vy+=0.08; p.vx*=0.97;
+    p.life-=p.decay;
+  });
+  particles = particles.filter(p=>p.life>0);
+  scorePopups.forEach(p=>{ p.y-=1.2; p.life-=0.022; });
+  scorePopups = scorePopups.filter(p=>p.life>0);
+
+  // ── LEVEL CLEAR CHECK
+  const orangeLeft = pegs.filter(p=>p.type==='o'&&!p.hit).length;
+  updateOrangeCounter();
+  if (orangeLeft === 0 && !ballInFlight && levelClearTimer === 0) {
+    levelClearTimer = 1;
+    setTimeout(onLevelClear, 800);
+  }
+
+  // ── OUT OF BALLS
+  if (!ballInFlight && ballsLeft <= 0 && orangeLeft > 0 && levelClearTimer === 0) {
+    setTimeout(onGameOver, 600);
+    levelClearTimer = 1;
+  }
+}
+
+function hitPeg(p, bx, by) {
+  // Score
+  const mult = feverMode ? 2 : 1;
+  const pts  = p.type==='o' ? 100*mult :
+               p.type==='g' ? 50*mult  :
+               p.type==='p' ? 200*mult : 10*mult;
+  score += pts;
+  if (score > hiScore) {
+    hiScore = score;
+    localStorage.setItem('pg_hi', hiScore);
+    document.getElementById('hi-el').textContent = hiScore;
+  }
+  document.getElementById('score-el').textContent = score;
+
+  // Particles — color matches peg type
+  spawnPegParticles(p.x, p.y, p.type);
+
+  // Green peg = extra ball
+  if (p.type === 'g') {
+    ballsLeft = Math.min(BALLS_MAX, ballsLeft + 1);
+    updateBallsUI();
+    scorePopups.push({x:p.x, y:p.y-18, text:'+BOLA', color:'#44ee66', life:1, size:0.9});
+  }
+  // Purple peg = fever mode
+  if (p.type === 'p') {
+    feverMode = true; feverTimer = 180;
+    scorePopups.push({x:p.x, y:p.y-18, text:'FIEBRE!', color:'#dd66ff', life:1, size:1.1});
+  }
+  // Orange peg popup
+  if (p.type === 'o') {
+    const orangeLeft = pegs.filter(q=>q.type==='o'&&!q.hit).length - 1;
+    if (orangeLeft <= 3 && orangeLeft > 0)
+      scorePopups.push({x:p.x, y:p.y-18, text:'¡'+orangeLeft+' QUEDAN!', color:'#ff9944', life:1, size:0.9});
+  }
+  scorePopups.push({x:bx, y:by-10, text:'+'+pts, color:PEG_COLORS[p.type].lit, life:1, size:0.8});
+}
+
+function endShot() {
+  ball = null;
+  ballInFlight = false;
+  // Remove all hit pegs instantly (already fading)
+}
+
+// ═══════════════════════════════════════════════════════
+// PARTICLES
+// ═══════════════════════════════════════════════════════
+function spawnPegParticles(x, y, type) {
+  const col = PEG_COLORS[type];
+  for (let i=0;i<16;i++) {
+    const a=Math.random()*Math.PI*2, s=1.5+Math.random()*4;
+    particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-2,
+      r:1.5+Math.random()*3, col:Math.random()>0.5?col.lit:col.glow,
+      life:1, decay:0.03+Math.random()*0.04});
+  }
+  // Glass shard effect — thin bright lines
+  for (let i=0;i<6;i++) {
+    const a=i/6*Math.PI*2, s=3+Math.random()*5;
+    particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,
+      r:0.8, col:'rgba(255,255,255,0.8)', life:1, decay:0.05, isLine:true,
+      angle:a, len:6+Math.random()*8});
+  }
+}
+
+function spawnBounceParticles(x, y, type) {
+  for (let i=0;i<6;i++) {
+    const a=Math.random()*Math.PI, s=1+Math.random()*2;
+    particles.push({x,y,vx:Math.cos(a)*s*(type==='wall'?-1:1),vy:-Math.random()*2,
+      r:1+Math.random()*2, col:'rgba(180,220,255,0.6)', life:1, decay:0.08});
+  }
+}
+
+function spawnBucketParticles(x, y) {
+  for (let i=0;i<22;i++) {
+    const a=Math.random()*Math.PI*2, s=2+Math.random()*5;
+    particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-4,
+      r:1.5+Math.random()*3,
+      col:['#ffd700','#ffaa00','#ffffff','#aaddff'][Math.floor(Math.random()*4)],
+      life:1,decay:0.025+Math.random()*0.03});
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// DRAW
+// ═══════════════════════════════════════════════════════
+function drawBackground() {
+  ctx.fillStyle = '#05030a';
+  ctx.fillRect(0,0,W,H);
+
+  // Cathedral arch outlines — decorative
+  ctx.strokeStyle = 'rgba(240,192,64,0.04)';
+  ctx.lineWidth   = 1;
+  const archCount = 4;
+  for (let i=0;i<archCount;i++) {
+    const ax = W/(archCount+1)*(i+1);
+    ctx.beginPath();
+    ctx.moveTo(ax-W*0.12, H);
+    ctx.lineTo(ax-W*0.12, H*0.4);
+    ctx.arc(ax, H*0.4, W*0.12, Math.PI, 0);
+    ctx.lineTo(ax+W*0.12, H);
+    ctx.stroke();
+  }
+
+  // Subtle radial grid
+  ctx.strokeStyle='rgba(240,192,64,0.025)';
+  ctx.lineWidth=0.5;
+  for (let r=W*0.1; r<W*1.2; r+=W*0.12) {
+    ctx.beginPath(); ctx.arc(W/2, H*0.35, r, 0, Math.PI*2); ctx.stroke();
+  }
+
+  // Fever mode background glow
+  if (feverMode) {
+    const ft = feverTimer/180;
+    const fg = ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,W*0.7);
+    fg.addColorStop(0, `rgba(204,34,255,${ft*0.08})`);
+    fg.addColorStop(1, 'transparent');
+    ctx.fillStyle=fg; ctx.fillRect(0,0,W,H);
+  }
+}
+
+function drawAimLine() {
+  if (ballInFlight) return;
+  const startX = W/2, startY = LAUNCHER_Y + BALL_R()*2;
+  const stepX  = Math.sin(aimAngle) * W*0.022;
+  const stepY  = Math.cos(aimAngle) * W*0.022;
+
+  // Dotted trajectory preview
+  ctx.setLineDash([4, 8]);
+  ctx.strokeStyle = 'rgba(240,192,64,0.35)';
+  ctx.lineWidth   = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(startX, startY);
+  let px=startX, py=startY, pvx=Math.sin(aimAngle)*H*0.012, pvy=Math.cos(aimAngle)*H*0.012;
+  for (let i=0;i<28;i++) {
+    pvy += GRAVITY;
+    px  += pvx; py += pvy;
+    if (px<0||px>W) break;
+    if (i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+    if (py > H*0.9) break;
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Launcher dot
+  ctx.fillStyle='rgba(240,192,64,0.8)'; ctx.shadowColor='#ffd700'; ctx.shadowBlur=10;
+  ctx.beginPath(); ctx.arc(W/2, LAUNCHER_Y, BALL_R()*0.7, 0, Math.PI*2); ctx.fill();
+  ctx.shadowBlur=0;
+
+  // Arrow tip
+  ctx.strokeStyle='rgba(240,192,64,0.6)'; ctx.lineWidth=2;
+  ctx.setLineDash([]);
+  ctx.beginPath(); ctx.moveTo(startX,startY); ctx.lineTo(startX+stepX*3,startY+stepY*3); ctx.stroke();
+}
+
+function drawPeg(p) {
+  const pr = p.r;
+  const col = PEG_COLORS[p.type];
+  const alpha = p.hit ? p.fadeTimer/80 : 1;
+  if (alpha <= 0) return;
+  ctx.globalAlpha = alpha;
+
+  const pulse = 0.5 + 0.5*Math.sin(p.glowPulse);
+
+  // Outer glow
+  const glowR = pr * (1.8 + pulse*0.4);
+  const grd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, glowR);
+  grd.addColorStop(0,   col.glow + (p.hit ? 'ff' : Math.round(pulse*60+40).toString(16).padStart(2,'0')));
+  grd.addColorStop(0.4, col.fill + '88');
+  grd.addColorStop(1,   'transparent');
+  ctx.fillStyle = grd;
+  ctx.beginPath(); ctx.arc(p.x, p.y, glowR, 0, Math.PI*2); ctx.fill();
+
+  // Gem body — stained glass look
+  const bodyGrd = ctx.createRadialGradient(p.x-pr*0.3, p.y-pr*0.3, 0, p.x, p.y, pr);
+  bodyGrd.addColorStop(0,   p.hit ? col.lit : col.shine);
+  bodyGrd.addColorStop(0.4, p.hit ? col.glow : col.fill);
+  bodyGrd.addColorStop(1,   p.hit ? col.glow : '#000000cc');
+  ctx.fillStyle = bodyGrd;
+  ctx.beginPath(); ctx.arc(p.x, p.y, pr, 0, Math.PI*2); ctx.fill();
+
+  // Gem facets — hexagonal lines
+  ctx.strokeStyle = p.hit ? col.lit : col.glow;
+  ctx.lineWidth   = 0.8;
+  ctx.globalAlpha = alpha * (p.hit ? 0.9 : 0.3);
+  for (let i=0;i<6;i++) {
+    const a = i/6*Math.PI*2;
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    ctx.lineTo(p.x+Math.cos(a)*pr, p.y+Math.sin(a)*pr);
+    ctx.stroke();
+  }
+
+  // Shine highlight
+  ctx.fillStyle = col.shine;
+  ctx.globalAlpha = alpha * 0.7;
+  ctx.beginPath(); ctx.arc(p.x-pr*0.28, p.y-pr*0.28, pr*0.35, 0, Math.PI*2); ctx.fill();
+
+  ctx.globalAlpha = 1;
+}
+
+function drawBall() {
+  if (!ball) return;
+
+  // Trail
+  ball.trail.forEach((t,i) => {
+    ctx.globalAlpha = t.t * 0.35;
+    const tr = ball.r * t.t * 0.7;
+    const tg = ctx.createRadialGradient(t.x,t.y,0,t.x,t.y,tr);
+    tg.addColorStop(0,'rgba(200,230,255,0.8)');
+    tg.addColorStop(1,'transparent');
+    ctx.fillStyle=tg;
+    ctx.beginPath(); ctx.arc(t.x,t.y,tr*1.5,0,Math.PI*2); ctx.fill();
+  });
+  ctx.globalAlpha=1;
+
+  // Glow
+  const glowGrd = ctx.createRadialGradient(ball.x,ball.y,0,ball.x,ball.y,ball.r*2.5);
+  glowGrd.addColorStop(0,'rgba(180,220,255,0.4)');
+  glowGrd.addColorStop(1,'transparent');
+  ctx.fillStyle=glowGrd;
+  ctx.beginPath(); ctx.arc(ball.x,ball.y,ball.r*2.5,0,Math.PI*2); ctx.fill();
+
+  // Ball body
+  const ballGrd = ctx.createRadialGradient(ball.x-ball.r*0.35,ball.y-ball.r*0.35,0,ball.x,ball.y,ball.r);
+  ballGrd.addColorStop(0,'#ffffff');
+  ballGrd.addColorStop(0.4,'#cce8ff');
+  ballGrd.addColorStop(1,'#3366aa');
+  ctx.fillStyle=ballGrd;
+  ctx.shadowColor='#aaddff'; ctx.shadowBlur=12;
+  ctx.beginPath(); ctx.arc(ball.x,ball.y,ball.r,0,Math.PI*2); ctx.fill();
+  ctx.shadowBlur=0;
+}
+
+function drawBucket() {
+  const bx=bucket.x, by=bucket.y, bw=bucket.w, bh=bucket.h;
+
+  // Glow under bucket
+  ctx.fillStyle='rgba(240,192,64,0.06)';
+  ctx.beginPath(); ctx.ellipse(bx,by+bh,bw*0.7,bh*0.4,0,0,Math.PI*2); ctx.fill();
+
+  // Bucket body — ornate cup
+  const bg=ctx.createLinearGradient(bx-bw/2,by,bx+bw/2,by);
+  bg.addColorStop(0,'#2a1a00');
+  bg.addColorStop(0.3,'#6a4a10');
+  bg.addColorStop(0.7,'#8a6020');
+  bg.addColorStop(1,'#2a1a00');
+  ctx.fillStyle=bg;
+  ctx.beginPath();
+  ctx.moveTo(bx-bw/2, by);
+  ctx.lineTo(bx-bw/2+bw*0.05, by+bh);
+  ctx.lineTo(bx+bw/2-bw*0.05, by+bh);
+  ctx.lineTo(bx+bw/2, by);
+  ctx.closePath(); ctx.fill();
+
+  // Gold rim
+  ctx.strokeStyle='#f0c040'; ctx.lineWidth=2;
+  ctx.shadowColor='#ffd700'; ctx.shadowBlur=8;
+  ctx.beginPath(); ctx.moveTo(bx-bw/2,by); ctx.lineTo(bx+bw/2,by); ctx.stroke();
+  ctx.shadowBlur=0;
+
+  // Gold side ornaments
+  ctx.fillStyle='#f0c040';
+  [bx-bw/2, bx+bw/2-3].forEach(ox=>{
+    ctx.beginPath(); ctx.arc(ox+1.5, by, 3, 0, Math.PI*2); ctx.fill();
+  });
+}
+
+function drawParticles() {
+  particles.forEach(p => {
+    ctx.globalAlpha = p.life;
+    if (p.isLine) {
+      ctx.strokeStyle = p.col; ctx.lineWidth = 1.5;
+      ctx.shadowColor=p.col; ctx.shadowBlur=4;
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(p.x+Math.cos(p.angle)*p.len*p.life, p.y+Math.sin(p.angle)*p.len*p.life);
+      ctx.stroke();
+      ctx.shadowBlur=0;
+    } else {
+      ctx.fillStyle=p.col; ctx.shadowColor=p.col; ctx.shadowBlur=6;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
+      ctx.shadowBlur=0;
+    }
+  });
+  ctx.globalAlpha=1;
+}
+
+function drawScorePopups() {
+  scorePopups.forEach(p=>{
+    ctx.globalAlpha=p.life;
+    ctx.fillStyle=p.color; ctx.shadowColor=p.color; ctx.shadowBlur=8;
+    ctx.font=`bold ${Math.round(W*0.045*p.size)}px 'Uncial Antiqua'`;
+    ctx.textAlign='center';
+    ctx.fillText(p.text, p.x, p.y);
+    ctx.shadowBlur=0;
+  });
+  ctx.globalAlpha=1; ctx.textAlign='left';
+}
+
+function drawHUD() {
+  // Fever indicator
+  if (feverMode) {
+    const ft=feverTimer/180;
+    ctx.fillStyle=`rgba(204,34,255,${ft*0.7})`;
+    ctx.font=`bold ${W*0.055}px 'Uncial Antiqua'`;
+    ctx.textAlign='center';
+    ctx.shadowColor='#dd66ff'; ctx.shadowBlur=14;
+    ctx.fillText('✦ FIEBRE ✦', W/2, H*0.06);
+    ctx.shadowBlur=0; ctx.textAlign='left';
+    // Fever timer bar
+    ctx.fillStyle='rgba(0,0,0,0.4)'; ctx.fillRect(W*0.1, H*0.075, W*0.8, 4);
+    ctx.fillStyle='#cc22ff'; ctx.shadowColor='#cc22ff'; ctx.shadowBlur=6;
+    ctx.fillRect(W*0.1, H*0.075, W*0.8*ft, 4);
+    ctx.shadowBlur=0;
+  }
+  // Orange peg progress bar at top
+  const totalO  = LEVEL_LAYOUTS[(currentLevel-1)%LEVEL_LAYOUTS.length]().filter(p=>p.type==='o').length;
+  const hitO    = totalO - pegs.filter(p=>p.type==='o'&&!p.hit).length;
+  const pct     = totalO>0 ? hitO/totalO : 0;
+  ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, H-4, W, 4);
+  const barGrd  = ctx.createLinearGradient(0,0,W*pct,0);
+  barGrd.addColorStop(0,'#aa3300'); barGrd.addColorStop(1,'#ff9944');
+  ctx.fillStyle = barGrd;
+  ctx.shadowColor='#ff6600'; ctx.shadowBlur=6;
+  ctx.fillRect(0, H-4, W*pct, 4);
+  ctx.shadowBlur=0;
+}
+
+function drawScene() {
+  drawBackground();
+  drawAimLine();
+  pegs.forEach(drawPeg);
+  drawBucket();
+  drawBall();
+  drawParticles();
+  drawScorePopups();
+  drawHUD();
+}
+
+// ═══════════════════════════════════════════════════════
+// LEVEL TRANSITIONS
+// ═══════════════════════════════════════════════════════
+function onLevelClear() {
+  // Bonus points for remaining balls
+  const bonus = ballsLeft * 500;
+  score += bonus;
+  document.getElementById('score-el').textContent = score;
+  if (score > hiScore) {
+    hiScore = score;
+    localStorage.setItem('pg_hi', hiScore);
+    document.getElementById('hi-el').textContent = hiScore;
+  }
+  // Big burst of gold particles
+  for (let i=0;i<50;i++) {
+    const a=Math.random()*Math.PI*2, s=2+Math.random()*8;
+    particles.push({x:W/2+Math.random()*W*0.6-W*0.3, y:H*0.4+Math.random()*H*0.3,
+      vx:Math.cos(a)*s, vy:Math.sin(a)*s-4,
+      r:2+Math.random()*4, col:Math.random()>0.5?'#ffd700':'#ff9944',
+      life:1, decay:0.018+Math.random()*0.015});
+  }
+  scorePopups.push({x:W/2, y:H*0.35, text:'¡NIVEL COMPLETO!', color:'#ffd700', life:2.5, size:1.4});
+  if (bonus>0) scorePopups.push({x:W/2, y:H*0.42, text:'+'+bonus+' BONUS', color:'#ffaa00', life:2.5, size:1});
+
+  state = 'levelclear';
+  setTimeout(()=>{
+    if (currentLevel >= TOTAL_LEVELS) {
+      showVictory();
+    } else {
+      showLevelClearOverlay();
+    }
+  }, 2200);
+}
+
+function showLevelClearOverlay() {
+  const ov = document.getElementById('overlay');
+  ov.classList.remove('hidden');
+  document.getElementById('ov-title').textContent = '✦ NIVEL '+currentLevel+' COMPLETO ✦';
+  document.getElementById('ov-sub').textContent   = 'PREPARATE PARA EL SIGUIENTE';
+  document.getElementById('ov-stats').classList.add('show');
+  document.getElementById('ov-score').textContent  = score;
+  document.getElementById('ov-level').textContent  = currentLevel;
+  document.getElementById('ov-btn').textContent    = '▶ NIVEL '+(currentLevel+1);
+  document.getElementById('ov-hint').textContent   = '';
+  document.getElementById('ov-btn').onclick = () => {
+    ballsLeft = BALLS_MAX;
+    initLevel(currentLevel + 1);
+    state = 'playing';
+    ov.classList.add('hidden');
+    document.getElementById('ov-stats').classList.remove('show');
+  };
+}
+
+function showVictory() {
+  const ov = document.getElementById('overlay');
+  ov.classList.remove('hidden');
+  document.getElementById('ov-title').textContent = '✦ VICTORIA ✦';
+  document.getElementById('ov-sub').textContent   = '¡COMPLETASTE TODOS LOS NIVELES!';
+  document.getElementById('ov-stats').classList.add('show');
+  document.getElementById('ov-score').textContent  = score;
+  document.getElementById('ov-level').textContent  = TOTAL_LEVELS;
+  document.getElementById('ov-btn').textContent    = '↺ JUGAR DE NUEVO';
+  document.getElementById('ov-btn').onclick = () => { score=0; ballsLeft=BALLS_MAX; startLevel(); };
+}
+
+function onGameOver() {
+  state='dead';
+  const ov=document.getElementById('overlay');
+  ov.classList.remove('hidden');
+  document.getElementById('ov-title').textContent  = 'SIN BOLAS';
+  document.getElementById('ov-sub').textContent    = 'LOS PEGS GANARON ESTA VEZ';
+  document.getElementById('ov-stats').classList.add('show');
+  document.getElementById('ov-score').textContent  = score;
+  document.getElementById('ov-level').textContent  = currentLevel;
+  document.getElementById('ov-btn').textContent    = '↺ REINTENTAR';
+  document.getElementById('ov-btn').onclick = () => {
+    score=0; ballsLeft=BALLS_MAX;
+    initLevel(currentLevel);
+    state='playing';
+    ov.classList.add('hidden');
+    document.getElementById('ov-stats').classList.remove('show');
+    document.getElementById('score-el').textContent='0';
+  };
+}
+
+// ═══════════════════════════════════════════════════════
+// GAME LOOP
+// ═══════════════════════════════════════════════════════
+function gameLoop() {
+  update();
+  drawScene();
+  animId = requestAnimationFrame(gameLoop);
+}
+
+function startLevel() {
+  score=0; ballsLeft=BALLS_MAX; currentLevel=1;
+  initLevel(1);
+  state='playing';
+  document.getElementById('overlay').classList.add('hidden');
+  document.getElementById('ov-stats').classList.remove('show');
+  document.getElementById('score-el').textContent='0';
+  if (!animId) gameLoop();
+}
+
+// ═══════════════════════════════════════════════════════
+// INPUT
+// ═══════════════════════════════════════════════════════
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  mouseX = (e.clientX - rect.left) * (W / rect.width);
+  mouseY = (e.clientY - rect.top)  * (H / rect.height);
+});
+canvas.addEventListener('click', e => {
+  if (state==='playing') fire();
+});
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  const rect = canvas.getBoundingClientRect();
+  const t = e.touches[0];
+  mouseX = (t.clientX - rect.left) * (W / rect.width);
+  mouseY = (t.clientY - rect.top)  * (H / rect.height);
+}, {passive:false});
+canvas.addEventListener('touchend', e => {
+  e.preventDefault();
+  if (state==='playing') fire();
+}, {passive:false});
+document.addEventListener('keydown', e => {
+  if (e.code==='Space') { e.preventDefault(); if(state==='playing') fire(); }
+});
+
+// Boot
+gameLoop();
+</script>
+</body>
+</html>
